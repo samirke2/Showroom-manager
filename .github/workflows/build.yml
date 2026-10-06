@@ -40,7 +40,7 @@ jobs:
         
         echo "=== Downloading freetype ==="
         wget -q --show-progress -O "$PKG_DIR/freetype/freetype-2.10.1.tar.gz" \
-          "https://ftp.gnu.org/gnu/freetype/freetype-2.10.1.tar.gz"
+          "https://sourceforge.net/projects/freetype/files/latest/download?hem=aa3246e6d766f59feb8993c3bbcc460818ccef02e654e2ac8650fc1a04c10dc7"
         touch "$PKG_DIR/freetype/.mark-freetype-2.10.1.tar.gz"
         
         echo "=== Downloading reportlab ==="
