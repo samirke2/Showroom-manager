@@ -45,22 +45,40 @@ jobs:
             url = 'https://files.pythonhosted.org/packages/source/r/reportlab/reportlab-{version}.tar.gz'
             depends = ['pillow', 'freetype']
             patches = []
-            site_packages_name = 'reportlab'
 
 
         recipe = ReportLabRecipe()
         EOF
-        echo "✅ Custom recipe created:"
+        echo "✅ Custom recipe created"
         cat custom_recipes/reportlab/__init__.py
     
-    - name: Add local_recipes to buildozer.spec
+    - name: Add p4a.local_recipes to [app] section
       run: |
-        if ! grep -q "^p4a.local_recipes" buildozer.spec; then
-          echo "" >> buildozer.spec
-          echo "p4a.local_recipes = ./custom_recipes" >> buildozer.spec
-        fi
-        echo "=== buildozer.spec (relevant lines) ==="
-        grep -E "requirements|local_recipes" buildozer.spec
+        python3 << 'PYEOF'
+        with open('buildozer.spec', 'r') as f:
+            lines = f.readlines()
+        
+        # إزالة أي سطر قديم
+        lines = [l for l in lines if not l.strip().startswith('p4a.local_recipes')]
+        
+        # إدراج السطر بعد requirements مباشرة (تحت [app])
+        out = []
+        inserted = False
+        for line in lines:
+            out.append(line)
+            if line.startswith('requirements =') and not inserted:
+                out.append('p4a.local_recipes = ./custom_recipes\n')
+                inserted = True
+        
+        with open('buildozer.spec', 'w') as f:
+            f.writelines(out)
+        
+        print("✅ Inserted:", inserted)
+        PYEOF
+        
+        echo ""
+        echo "═══════ buildozer.spec (relevant lines) ═══════"
+        grep -nE "^\[|^requirements|^p4a\." buildozer.spec
     
     - name: Pre-download freetype and reportlab
       run: |
@@ -68,7 +86,7 @@ jobs:
         PKG_DIR=".buildozer/android/platform/build-arm64-v8a/packages"
         mkdir -p "$PKG_DIR/freetype" "$PKG_DIR/reportlab"
         
-        # ═══════ FREETYPE ═══════
+        # ═══ FREETYPE ═══
         echo "═══════ Downloading freetype ═══════"
         curl -4 -fL --retry 3 --connect-timeout 30 --max-time 300 \
           -o "$PKG_DIR/freetype/freetype-2.10.1.tar.gz" \
@@ -82,17 +100,19 @@ jobs:
         touch "$PKG_DIR/freetype/.mark-freetype-2.10.1.tar.gz"
         echo "✅ Freetype OK"
         
-        # ═══════ REPORTLAB ═══════
+        # ═══ REPORTLAB ═══ (اسم الملف يطابق وصفة p4a الأصلية)
         echo "═══════ Downloading reportlab ═══════"
         curl -4 -fL --retry 3 --connect-timeout 30 --max-time 300 \
-          -o "$PKG_DIR/reportlab/reportlab-3.6.13.tar.gz" \
+          -o "$PKG_DIR/reportlab/fe660f227cac.tar.gz" \
           "https://files.pythonhosted.org/packages/source/r/reportlab/reportlab-3.6.13.tar.gz"
         
-        SIZE=$(stat -c%s "$PKG_DIR/reportlab/reportlab-3.6.13.tar.gz")
+        SIZE=$(stat -c%s "$PKG_DIR/reportlab/fe660f227cac.tar.gz")
         echo "Reportlab size: $SIZE bytes"
-        if ! tar -tzf "$PKG_DIR/reportlab/reportlab-3.6.13.tar.gz" >/dev/null 2>&1; then
+        if ! tar -tzf "$PKG_DIR/reportlab/fe660f227cac.tar.gz" >/dev/null 2>&1; then
           echo "❌ Reportlab tarball invalid!"; exit 1
         fi
+        # ننشئ ملفي العلامة (الاسم القديم والجديد) لضمان تخطي التحميل في كل الحالات
+        touch "$PKG_DIR/reportlab/.mark-fe660f227cac.tar.gz"
         touch "$PKG_DIR/reportlab/.mark-reportlab-3.6.13.tar.gz"
         echo "✅ Reportlab OK"
         
