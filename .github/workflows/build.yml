@@ -26,31 +26,89 @@ jobs:
           autoconf libtool pkg-config \
           zlib1g-dev libncurses5-dev libncursesw5-dev \
           cmake libffi-dev libssl-dev \
-          libltdl-dev ccache wget
+          libltdl-dev ccache curl
     
     - name: Install Python dependencies
       run: |
         pip install --upgrade pip
         pip install buildozer cython==0.29.36 virtualenv
     
-    - name: Pre-download problematic packages
+    - name: Patch p4a recipes for freetype and reportlab
       run: |
+        # نسخة p4a ستُنزّل لاحقاً، لذا نضع patch script يعمل قبل البناء
+        cat > /tmp/patch_recipes.sh << 'PATCH_EOF'
+        #!/bin/bash
+        set -e
+        
+        P4A_DIR="$1"
+        [ -z "$P4A_DIR" ] && P4A_DIR=".buildozer/android/platform/python-for-android"
+        
+        # ═══ Patch freetype recipe ═══
+        FT_RECIPE="$P4A_DIR/pythonforandroid/recipes/freetype/__init__.py"
+        if [ -f "$FT_RECIPE" ]; then
+          # استبدل URL القديم بـ SourceForge direct link (يعمل من GitHub Actions)
+          sed -i 's|https://download.savannah.gnu.org/releases/freetype/freetype-{version}.tar.gz|https://downloads.sourceforge.net/project/freetype/freetype2/2.10.1/freetype-2.10.1.tar.gz|g' "$FT_RECIPE"
+          sed -i 's|version = .*|version = "2.10.1"|' "$FT_RECIPE"
+          echo "✅ Patched freetype recipe"
+        fi
+        
+        # ═══ Patch reportlab recipe ═══
+        RL_RECIPE="$P4A_DIR/pythonforandroid/recipes/reportlab/__init__.py"
+        if [ -f "$RL_RECIPE" ]; then
+          sed -i 's|https://hg.reportlab.com/hg-public/reportlab/archive/{version}.tar.gz|https://github.com/MrBitBucket/reportlab-mirror/archive/{version}.tar.gz|g' "$RL_RECIPE"
+          echo "✅ Patched reportlab recipe"
+        fi
+        PATCH_EOF
+        chmod +x /tmp/patch_recipes.sh
+        echo "✅ Patch script created"
+    
+    - name: Pre-download freetype and reportlab
+      run: |
+        set -e
         PKG_DIR=".buildozer/android/platform/build-arm64-v8a/packages"
         mkdir -p "$PKG_DIR/freetype" "$PKG_DIR/reportlab"
         
-        echo "=== Downloading freetype ==="
-        wget -q --show-progress -O "$PKG_DIR/freetype/freetype-2.10.1.tar.gz" \
-          "https://sourceforge.net/projects/freetype/files/latest/download?hem=aa3246e6d766f59feb8993c3bbcc460818ccef02e654e2ac8650fc1a04c10dc7"
+        # ═══ FREETYPE ═══
+        echo "═══════ Downloading freetype ═══════"
+        FT_TARGET="$PKG_DIR/freetype/freetype-2.10.1.tar.gz"
+        curl -4 -fL --retry 3 --connect-timeout 30 --max-time 300 \
+          -o "$FT_TARGET" \
+          "https://downloads.sourceforge.net/project/freetype/freetype2/2.10.1/freetype-2.10.1.tar.gz"
+        
+        # تحقق من أن الملف أرشيف فعلي
+        file "$FT_TARGET"
+        SIZE=$(stat -c%s "$FT_TARGET")
+        echo "Freetype size: $SIZE bytes"
+        
+        if ! tar -tzf "$FT_TARGET" >/dev/null 2>&1; then
+          echo "❌ Freetype tarball invalid!"
+          head -c 200 "$FT_TARGET"
+          exit 1
+        fi
+        
         touch "$PKG_DIR/freetype/.mark-freetype-2.10.1.tar.gz"
+        echo "✅ Freetype OK"
         
-        echo "=== Downloading reportlab ==="
-        wget -q --show-progress -O "$PKG_DIR/reportlab/fe660f227cac.tar.gz" \
-          "https://github.com/MrBitBucket/reportlab-mirror/archive/fe660f227cac.tar.gz" || \
-        wget -q --show-progress -O "$PKG_DIR/reportlab/fe660f227cac.tar.gz" \
-          "https://files.pythonhosted.org/packages/source/r/reportlab/reportlab-3.6.13.tar.gz"
+        # ═══ REPORTLAB ═══
+        echo "═══════ Downloading reportlab ═══════"
+        RL_TARGET="$PKG_DIR/reportlab/fe660f227cac.tar.gz"
+        curl -4 -fL --retry 3 --connect-timeout 30 --max-time 300 \
+          -o "$RL_TARGET" \
+          "https://codeload.github.com/MrBitBucket/reportlab-mirror/tar.gz/fe660f227cac"
+        
+        file "$RL_TARGET"
+        SIZE=$(stat -c%s "$RL_TARGET")
+        echo "Reportlab size: $SIZE bytes"
+        
+        if ! tar -tzf "$RL_TARGET" >/dev/null 2>&1; then
+          echo "❌ Reportlab tarball invalid!"
+          exit 1
+        fi
+        
         touch "$PKG_DIR/reportlab/.mark-fe660f227cac.tar.gz"
+        echo "✅ Reportlab OK"
         
-        echo "=== Verification ==="
+        echo "═══════ Final verification ═══════"
         ls -lh "$PKG_DIR/freetype/"
         ls -lh "$PKG_DIR/reportlab/"
     
@@ -59,7 +117,21 @@ jobs:
       with:
         key: android-build
     
-    - name: Build APK with Buildozer
+    - name: Build APK with Buildozer (first run to fetch p4a)
+      run: |
+        export USE_CCACHE=1
+        # Run once - it will fail but downloads p4a
+        timeout 120 buildozer -v android debug || true
+        echo "=== First run done, p4a should now exist ==="
+        ls -la .buildozer/android/platform/ || true
+    
+    - name: Apply patches to p4a recipes
+      run: |
+        /tmp/patch_recipes.sh ".buildozer/android/platform/python-for-android"
+        echo "=== Verification of patched recipe ==="
+        grep -n "url" .buildozer/android/platform/python-for-android/pythonforandroid/recipes/freetype/__init__.py | head -5
+    
+    - name: Build APK with Buildozer (final)
       run: |
         export USE_CCACHE=1
         buildozer -v android debug
