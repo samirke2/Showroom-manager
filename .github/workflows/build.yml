@@ -35,27 +35,21 @@ jobs:
     
     - name: Patch p4a recipes for freetype and reportlab
       run: |
-        # نسخة p4a ستُنزّل لاحقاً، لذا نضع patch script يعمل قبل البناء
         cat > /tmp/patch_recipes.sh << 'PATCH_EOF'
         #!/bin/bash
         set -e
-        
         P4A_DIR="$1"
         [ -z "$P4A_DIR" ] && P4A_DIR=".buildozer/android/platform/python-for-android"
         
-        # ═══ Patch freetype recipe ═══
         FT_RECIPE="$P4A_DIR/pythonforandroid/recipes/freetype/__init__.py"
         if [ -f "$FT_RECIPE" ]; then
-          # استبدل URL القديم بـ SourceForge direct link (يعمل من GitHub Actions)
           sed -i 's|https://download.savannah.gnu.org/releases/freetype/freetype-{version}.tar.gz|https://downloads.sourceforge.net/project/freetype/freetype2/2.10.1/freetype-2.10.1.tar.gz|g' "$FT_RECIPE"
-          sed -i 's|version = .*|version = "2.10.1"|' "$FT_RECIPE"
           echo "✅ Patched freetype recipe"
         fi
         
-        # ═══ Patch reportlab recipe ═══
         RL_RECIPE="$P4A_DIR/pythonforandroid/recipes/reportlab/__init__.py"
         if [ -f "$RL_RECIPE" ]; then
-          sed -i 's|https://hg.reportlab.com/hg-public/reportlab/archive/{version}.tar.gz|https://github.com/MrBitBucket/reportlab-mirror/archive/{version}.tar.gz|g' "$RL_RECIPE"
+          sed -i 's|https://hg.reportlab.com/hg-public/reportlab/archive/{version}.tar.gz|https://files.pythonhosted.org/packages/source/r/reportlab/reportlab-3.6.13.tar.gz|g' "$RL_RECIPE"
           echo "✅ Patched reportlab recipe"
         fi
         PATCH_EOF
@@ -75,15 +69,12 @@ jobs:
           -o "$FT_TARGET" \
           "https://downloads.sourceforge.net/project/freetype/freetype2/2.10.1/freetype-2.10.1.tar.gz"
         
-        # تحقق من أن الملف أرشيف فعلي
         file "$FT_TARGET"
         SIZE=$(stat -c%s "$FT_TARGET")
         echo "Freetype size: $SIZE bytes"
         
         if ! tar -tzf "$FT_TARGET" >/dev/null 2>&1; then
-          echo "❌ Freetype tarball invalid!"
-          head -c 200 "$FT_TARGET"
-          exit 1
+          echo "❌ Freetype tarball invalid!"; exit 1
         fi
         
         touch "$PKG_DIR/freetype/.mark-freetype-2.10.1.tar.gz"
@@ -92,18 +83,24 @@ jobs:
         # ═══ REPORTLAB ═══
         echo "═══════ Downloading reportlab ═══════"
         RL_TARGET="$PKG_DIR/reportlab/fe660f227cac.tar.gz"
-        curl -4 -fL --retry 3 --connect-timeout 30 --max-time 300 \
-          -o "$RL_TARGET" \
-          "https://codeload.github.com/MrBitBucket/reportlab-mirror/tar.gz/fe660f227cac"
+        TMP_RL=$(mktemp -d)
         
-        file "$RL_TARGET"
+        curl -4 -fL --retry 3 --connect-timeout 30 --max-time 300 \
+          -o "$TMP_RL/reportlab-3.6.13.tar.gz" \
+          "https://files.pythonhosted.org/packages/source/r/reportlab/reportlab-3.6.13.tar.gz"
+        
+        file "$TMP_RL/reportlab-3.6.13.tar.gz"
+        
+        cd "$TMP_RL"
+        tar -xzf reportlab-3.6.13.tar.gz
+        mv reportlab-3.6.13 reportlab-fe660f227cac
+        tar -czf "$OLDPWD/$RL_TARGET" reportlab-fe660f227cac
+        cd "$OLDPWD"
+        rm -rf "$TMP_RL"
+        
+        tar -tzf "$RL_TARGET" | head -3
         SIZE=$(stat -c%s "$RL_TARGET")
         echo "Reportlab size: $SIZE bytes"
-        
-        if ! tar -tzf "$RL_TARGET" >/dev/null 2>&1; then
-          echo "❌ Reportlab tarball invalid!"
-          exit 1
-        fi
         
         touch "$PKG_DIR/reportlab/.mark-fe660f227cac.tar.gz"
         echo "✅ Reportlab OK"
@@ -120,16 +117,13 @@ jobs:
     - name: Build APK with Buildozer (first run to fetch p4a)
       run: |
         export USE_CCACHE=1
-        # Run once - it will fail but downloads p4a
         timeout 120 buildozer -v android debug || true
-        echo "=== First run done, p4a should now exist ==="
-        ls -la .buildozer/android/platform/ || true
+        echo "=== First run done ==="
     
     - name: Apply patches to p4a recipes
       run: |
         /tmp/patch_recipes.sh ".buildozer/android/platform/python-for-android"
-        echo "=== Verification of patched recipe ==="
-        grep -n "url" .buildozer/android/platform/python-for-android/pythonforandroid/recipes/freetype/__init__.py | head -5
+        grep -n "url" .buildozer/android/platform/python-for-android/pythonforandroid/recipes/reportlab/__init__.py | head -3
     
     - name: Build APK with Buildozer (final)
       run: |
