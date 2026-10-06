@@ -26,12 +26,33 @@ jobs:
           autoconf libtool pkg-config \
           zlib1g-dev libncurses5-dev libncursesw5-dev \
           cmake libffi-dev libssl-dev \
-          libltdl-dev ccache
+          libltdl-dev ccache wget
     
     - name: Install Python dependencies
       run: |
         pip install --upgrade pip
         pip install buildozer cython==0.29.36 virtualenv
+    
+    - name: Pre-download problematic packages
+      run: |
+        PKG_DIR=".buildozer/android/platform/build-arm64-v8a/packages"
+        mkdir -p "$PKG_DIR/freetype" "$PKG_DIR/reportlab"
+        
+        echo "=== Downloading freetype ==="
+        wget -q --show-progress -O "$PKG_DIR/freetype/freetype-2.10.1.tar.gz" \
+          "https://ftp.gnu.org/gnu/freetype/freetype-2.10.1.tar.gz"
+        touch "$PKG_DIR/freetype/.mark-freetype-2.10.1.tar.gz"
+        
+        echo "=== Downloading reportlab ==="
+        wget -q --show-progress -O "$PKG_DIR/reportlab/fe660f227cac.tar.gz" \
+          "https://github.com/MrBitBucket/reportlab-mirror/archive/fe660f227cac.tar.gz" || \
+        wget -q --show-progress -O "$PKG_DIR/reportlab/fe660f227cac.tar.gz" \
+          "https://files.pythonhosted.org/packages/source/r/reportlab/reportlab-3.6.13.tar.gz"
+        touch "$PKG_DIR/reportlab/.mark-fe660f227cac.tar.gz"
+        
+        echo "=== Verification ==="
+        ls -lh "$PKG_DIR/freetype/"
+        ls -lh "$PKG_DIR/reportlab/"
     
     - name: Setup ccache
       uses: hendrikmuhs/ccache-action@v1.2
