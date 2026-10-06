@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [ "main", "master" ]
 
-# هذا المتغير يحل مشكلة تحذير Node.js 20 (Deprecation Warning)
+# حل مشكلة تحذير Node.js 20
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -15,37 +15,33 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # 1. سحب الكود من المستودع
+    # 1. سحب الكود
     - name: Checkout repository
       uses: actions/checkout@v4
-      # ملاحظة: إذا توفر إصدار أحدث مثل v6، يفضل استخدامه لتجنب التحذيرات
 
-    # 2. إعداد بيئة Java (مطلوبة لبناء تطبيقات الأندرويد)
+    # 2. إعداد Java
     - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
 
-    # 3. إعداد Python (كما ظهر في تحذيراتك، قد يحتاجه المشروع لأدوات مساعدة)
+    # 3. إعداد Python
     - name: Setup Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
 
-    # 4. إعداد ccache (كما ظهر في تحذيراتك، لتسريع البناء)
+    # 4. إعداد ccache (تم تصحيح الإصدار هنا)
     - name: Setup ccache
-      uses: hendrikmuhs/ccache-action@v1.3
-      # تم التحديث من v1.2 إلى v1.3 لتجنب التحذيرات
+      uses: hendrikmuhs/ccache-action@v1.2.24
+      with:
+        key: ${{ github.job }}-${{ runner.os }}
 
-    # 5. إعطاء صلاحية التنفيذ لملف gradlew
+    # 5. صلاحية تنفيذ gradlew
     - name: Grant execute permission for gradlew
       run: chmod +x ./gradlew
-      # ملاحظة هامة: إذا كان مشروع الأندرويد داخل مجلد فرعي (مثل React Native أو Flutter)، 
-      # يجب تغيير المسار إلى: chmod +x ./android/gradlew
 
-    # 6. أمر البناء النهائي
+    # 6. البناء النهائي
     - name: Build with Gradle
       run: ./gradlew assembleDebug
-      # ملاحظة: إذا كان المشروع في مجلد فرعي، غير الأمر إلى: ./android/gradlew assembleDebug
-      # يمكنك تغيير assembleDebug إلى bundleRelease إذا كنت تريد بناء نسخة للإصدار
