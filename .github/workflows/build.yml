@@ -33,7 +33,7 @@ jobs:
         pip install --upgrade pip
         pip install buildozer cython==0.29.36 virtualenv
     
-    - name: Patch p4a recipes for freetype and reportlab
+    - name: Create patch script
       run: |
         cat > /tmp/patch_recipes.sh << 'PATCH_EOF'
         #!/bin/bash
@@ -41,15 +41,20 @@ jobs:
         P4A_DIR="$1"
         [ -z "$P4A_DIR" ] && P4A_DIR=".buildozer/android/platform/python-for-android"
         
+        # ═══ Patch freetype recipe ═══
         FT_RECIPE="$P4A_DIR/pythonforandroid/recipes/freetype/__init__.py"
         if [ -f "$FT_RECIPE" ]; then
           sed -i 's|https://download.savannah.gnu.org/releases/freetype/freetype-{version}.tar.gz|https://downloads.sourceforge.net/project/freetype/freetype2/2.10.1/freetype-2.10.1.tar.gz|g' "$FT_RECIPE"
           echo "✅ Patched freetype recipe"
         fi
         
+        # ═══ Patch reportlab recipe ═══
         RL_RECIPE="$P4A_DIR/pythonforandroid/recipes/reportlab/__init__.py"
         if [ -f "$RL_RECIPE" ]; then
+          # تغيير URL التحميل إلى PyPI
           sed -i 's|https://hg.reportlab.com/hg-public/reportlab/archive/{version}.tar.gz|https://files.pythonhosted.org/packages/source/r/reportlab/reportlab-3.6.13.tar.gz|g' "$RL_RECIPE"
+          # تعطيل الـ patches القديمة لأن 3.6.13 لا يحتاجها
+          sed -i "s/patches = \[.*\]/patches = []/" "$RL_RECIPE"
           echo "✅ Patched reportlab recipe"
         fi
         PATCH_EOF
@@ -62,9 +67,12 @@ jobs:
         PKG_DIR=".buildozer/android/platform/build-arm64-v8a/packages"
         mkdir -p "$PKG_DIR/freetype" "$PKG_DIR/reportlab"
         
-        # ═══ FREETYPE ═══
+        # ═══════════════════════════════════════════════
+        # FREETYPE
+        # ═══════════════════════════════════════════════
         echo "═══════ Downloading freetype ═══════"
         FT_TARGET="$PKG_DIR/freetype/freetype-2.10.1.tar.gz"
+        
         curl -4 -fL --retry 3 --connect-timeout 30 --max-time 300 \
           -o "$FT_TARGET" \
           "https://downloads.sourceforge.net/project/freetype/freetype2/2.10.1/freetype-2.10.1.tar.gz"
@@ -74,30 +82,38 @@ jobs:
         echo "Freetype size: $SIZE bytes"
         
         if ! tar -tzf "$FT_TARGET" >/dev/null 2>&1; then
-          echo "❌ Freetype tarball invalid!"; exit 1
+          echo "❌ Freetype tarball invalid!"
+          exit 1
         fi
         
         touch "$PKG_DIR/freetype/.mark-freetype-2.10.1.tar.gz"
         echo "✅ Freetype OK"
         
-        # ═══ REPORTLAB ═══
+        # ═══════════════════════════════════════════════
+        # REPORTLAB
+        # ═══════════════════════════════════════════════
         echo "═══════ Downloading reportlab ═══════"
         RL_TARGET="$PKG_DIR/reportlab/fe660f227cac.tar.gz"
         TMP_RL=$(mktemp -d)
         
+        # التنزيل من PyPI
         curl -4 -fL --retry 3 --connect-timeout 30 --max-time 300 \
           -o "$TMP_RL/reportlab-3.6.13.tar.gz" \
           "https://files.pythonhosted.org/packages/source/r/reportlab/reportlab-3.6.13.tar.gz"
         
         file "$TMP_RL/reportlab-3.6.13.tar.gz"
         
+        # فك الضغط وإعادة التسمية الداخلية
         cd "$TMP_RL"
         tar -xzf reportlab-3.6.13.tar.gz
         mv reportlab-3.6.13 reportlab-fe660f227cac
+        
+        # إعادة الضغط بالاسم الصحيح الذي يتوقعه p4a
         tar -czf "$OLDPWD/$RL_TARGET" reportlab-fe660f227cac
         cd "$OLDPWD"
         rm -rf "$TMP_RL"
         
+        # التحقق
         tar -tzf "$RL_TARGET" | head -3
         SIZE=$(stat -c%s "$RL_TARGET")
         echo "Reportlab size: $SIZE bytes"
@@ -105,6 +121,7 @@ jobs:
         touch "$PKG_DIR/reportlab/.mark-fe660f227cac.tar.gz"
         echo "✅ Reportlab OK"
         
+        echo ""
         echo "═══════ Final verification ═══════"
         ls -lh "$PKG_DIR/freetype/"
         ls -lh "$PKG_DIR/reportlab/"
@@ -114,18 +131,26 @@ jobs:
       with:
         key: android-build
     
-    - name: Build APK with Buildozer (first run to fetch p4a)
+    - name: First run to fetch p4a
       run: |
         export USE_CCACHE=1
-        timeout 120 buildozer -v android debug || true
-        echo "=== First run done ==="
+        # هذه المحاولة ستفشل، لكنها تنزّل python-for-android
+        timeout 180 buildozer -v android debug || true
+        echo "=== First run done, p4a should exist now ==="
+        ls -la .buildozer/android/platform/ || true
     
     - name: Apply patches to p4a recipes
       run: |
         /tmp/patch_recipes.sh ".buildozer/android/platform/python-for-android"
-        grep -n "url" .buildozer/android/platform/python-for-android/pythonforandroid/recipes/reportlab/__init__.py | head -3
+        echo ""
+        echo "═══════ Verification ═══════"
+        echo "--- freetype recipe URL ---"
+        grep -n "url = " .buildozer/android/platform/python-for-android/pythonforandroid/recipes/freetype/__init__.py | head -3
+        echo ""
+        echo "--- reportlab recipe URL & patches ---"
+        grep -nE "url = |patches = " .buildozer/android/platform/python-for-android/pythonforandroid/recipes/reportlab/__init__.py | head -5
     
-    - name: Build APK with Buildozer (final)
+    - name: Build APK with Buildozer
       run: |
         export USE_CCACHE=1
         buildozer -v android debug
