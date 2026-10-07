@@ -57,6 +57,37 @@ jobs:
           restore-keys: |
             buildozer-${{ runner.os }}-
 
+      - name: Pre-download Python sources (python.org blocks 403)
+        run: |
+          set -e
+          for V in 3.10.10 3.10.11; do
+            F="Python-$V.tgz"
+            ok=0
+            for URL in \
+              "https://www.python.org/ftp/python/$V/$F" \
+              "https://mirrors.huaweicloud.com/python/$V/$F" \
+              "https://registry.npmmirror.com/-/binary/python/$V/$F" \
+              "https://mirrors.aliyun.com/python-release/source/$F"; do
+              echo "Trying $URL"
+              if curl -fL --retry 3 -A "Mozilla/5.0 (X11; Linux x86_64)" -o "/tmp/$F" "$URL" && tar -tzf "/tmp/$F" >/dev/null 2>&1; then
+                ok=1; echo "OK: $URL"; break
+              fi
+            done
+            if [ "$ok" = "1" ]; then
+              for ARCH in arm64-v8a armeabi-v7a; do
+                for R in python3 hostpython3; do
+                  D=".buildozer/android/platform/build-$ARCH/packages/$R"
+                  mkdir -p "$D"
+                  cp "/tmp/$F" "$D/$F"
+                  touch "$D/.mark-$F"
+                done
+              done
+            else
+              echo "::warning::could not download $F"
+            fi
+          done
+          ls -R .buildozer/android/platform/build-arm64-v8a/packages | head -20
+
       - name: Build APK
         run: |
           set -o pipefail
