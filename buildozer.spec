@@ -1,7 +1,7 @@
 [app]
-title = ShowroomManager
-package.name = ShowroomManager
-package.domain = org.ShowroomManager
+title = Samir Pyth_DZ
+package.name = samirpythdz
+package.domain = org.samir
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,ttf,xml
 source.exclude_dirs = bin, .buildozer, venv, __pycache__, .git
