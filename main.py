@@ -553,11 +553,11 @@ def save_contract_articles(lang, articles):
 
 
 # =====================================================================
-#  الترجمة (تم تغيير اسم التطبيق هنا)
+#  الترجمة
 # =====================================================================
 TRANSLATIONS = {
     "ar": {
-        "app_title": "Showroom Manager",  # ⬅️ تم التغيير
+        "app_title": "Showroom Manager",
         "tab_cars": "السيارات", "tab_clients": "الزبائن",
         "tab_contracts": "العقود", "tab_settings": "الإعدادات",
         "stat_available": "متوفر", "stat_reserved": "محجوز", "stat_sold": "مباع",
@@ -677,7 +677,7 @@ TRANSLATIONS = {
         "color_black": "أسود", "color_navy_dark": "كحلي فاخر",
         "color_white": "أبيض",
         "upgrade_now": "ترقية الآن", "upgrade_title": "ترقية للنسخة الكاملة",
-        "welcome_title": "مرحباً بك في Samir Pyth_DZ",
+        "welcome_title": "مرحباً بك في Showroom Manager",
         "export_data": "تصدير البيانات",
         "export_cars": "تصدير السيارات (CSV)",
         "export_clients": "تصدير الزبائن (CSV)",
@@ -706,7 +706,7 @@ TRANSLATIONS = {
         "premium_locked": "هذه الميزة متاحة في النسخة الكاملة فقط",
     },
     "fr": {
-        "app_title": "Showroom Manager",  # ⬅️ تم التغيير
+        "app_title": "Showroom Manager",
         "tab_cars": "Vehicules", "tab_clients": "Clients",
         "tab_contracts": "Contrats", "tab_settings": "Parametres",
         "stat_available": "Disponible", "stat_reserved": "Reserve", "stat_sold": "Vendu",
@@ -830,7 +830,7 @@ TRANSLATIONS = {
         "color_white": "Blanc",
         "upgrade_now": "Mettre a niveau",
         "upgrade_title": "Version complete",
-        "welcome_title": "Bienvenue dans Samir Pyth_DZ",
+        "welcome_title": "Bienvenue dans Showroom Manager",
         "export_data": "Exporter",
         "export_cars": "Exporter Vehicules (CSV)",
         "export_clients": "Exporter Clients (CSV)",
@@ -1658,7 +1658,7 @@ def set_field_val(field, value):
 
 
 # =====================================================================
-#  KV (تم إضافة canvas.before لمنع الأشرطة السوداء، و on_switch_tabs)
+#  KV (تم إزالة on_switch_tabs لمنع الانهيار)
 # =====================================================================
 KV = '''
 <FormField@ArabicField>:
@@ -2292,7 +2292,6 @@ MDScreen:
                     text_size: self.width, None
 
         MDBottomNavigation:
-            on_switch_tabs: app.on_tab_switch()
             panel_color: 1, 1, 1, 1
             selected_color_background: 0.08, 0.45, 0.75, 0.12
             text_color_active: 0.08, 0.45, 0.75, 1
@@ -2765,7 +2764,7 @@ class LanguageSelector(MDBoxLayout):
 class AutoManagerApp(MDApp):
     font_file = FONT_FILE if os.path.exists(FONT_FILE) else "Roboto"
     logo_path = StringProperty("")
-    app_display_title = StringProperty("Showroom Manager")  # ⬅️ تم التغيير
+    app_display_title = StringProperty("Showroom Manager")
     current_lang = StringProperty("ar")
 
     version_badge_text = StringProperty("FREE")
@@ -2989,21 +2988,10 @@ class AutoManagerApp(MDApp):
         self.theme_cls.theme_style = "Light"
         self.theme_cls.primary_palette = "Blue"
         try:
-            self.theme_cls.font_styles["Icon"] = ["Icons", "materialdesignicons-webfont.ttf"]
-        except Exception:
-            pass
-        try:
             init_db()
         except Exception as e:
             print("init_db error:", e)
         return Builder.load_string(KV)
-
-    def on_tab_switch(self, *args):
-        from kivy.clock import Clock
-        def _redraw(dt):
-            if self.root:
-                self.root.canvas.ask_update()
-        Clock.schedule_once(_redraw, 0.2)
 
     def load_all_data(self):
         try: self.load_cars()
@@ -5703,7 +5691,9 @@ if __name__ == '__main__':
         print(err)
         print("=" * 60)
         try:
-            with open("startup_error.txt", "w", encoding="utf-8") as f:
+            # حفظ ملف الخطأ في مجلد التطبيق لسهولة الوصول إليه
+            err_dir = app_storage_dir()
+            with open(os.path.join(err_dir, "startup_error.txt"), "w", encoding="utf-8") as f:
                 f.write(err)
         except Exception:
             pass
