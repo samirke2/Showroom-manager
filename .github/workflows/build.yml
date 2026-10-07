@@ -65,8 +65,11 @@ jobs:
       - name: Show error summary
         if: failure()
         run: |
-          echo "===== LAST 80 LINES ====="
-          tail -n 80 build.log || true
+          echo "===== AROUND FIRST TRACEBACK ====="
+          L=$(grep -n "Traceback" build.log | head -1 | cut -d: -f1)
+          if [ -n "$L" ]; then S=$((L>40 ? L-40 : 1)); sed -n "${S},$((L+45))p" build.log; fi
+          echo "===== DOWNLOADS ====="
+          grep -n -i "download" build.log | tail -n 15 || true
           echo "===== ERROR LINES ====="
           grep -nE "ERROR|Error:|error:|FAILED|Traceback|No module|No matching|Exception|not found" build.log | tail -n 40 || true
 
