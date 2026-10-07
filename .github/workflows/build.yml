@@ -101,6 +101,8 @@ jobs:
           sed -i '/^android\.extra_manifest_application_arguments/d' buildozer.spec
           sed -i '/<\/application>/i\    <provider android:name="androidx.core.content.FileProvider" android:authorities="org.samir.samirpythdz.fileprovider" android:exported="false" android:grantUriPermissions="true"><meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" /></provider>' .p4a/pythonforandroid/bootstraps/sdl2/build/templates/AndroidManifest.tmpl.xml
           grep -n "provider" .p4a/pythonforandroid/bootstraps/sdl2/build/templates/AndroidManifest.tmpl.xml
+          # p4a copies a *file* resource to res/<dest> literally, so dest must include the file name
+          sed -i 's|^android.add_resources.*|android.add_resources = ./xml/file_paths.xml:xml/file_paths.xml|' buildozer.spec
           cat >> .p4a/pythonforandroid/recipe.py <<'PYEOF'
           
           
