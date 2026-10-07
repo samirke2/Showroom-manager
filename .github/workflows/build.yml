@@ -92,6 +92,10 @@ jobs:
         run: |
           set -e
           git clone --depth 1 --branch v2024.01.21 https://github.com/kivy/python-for-android.git .p4a
+          # reportlab recipe downloads from dead hosts (hg.reportlab.com / reportlab.com/ftp -> 403).
+          # Remove it so p4a installs reportlab 4.x (pure Python) from PyPI instead.
+          rm -rf .p4a/pythonforandroid/recipes/reportlab
+          sed -i -E 's/(^requirements *=.*[=,])reportlab(,|$)/\1reportlab==4.0.9\2/' buildozer.spec
           cat >> .p4a/pythonforandroid/recipe.py <<'PYEOF'
           
           
@@ -104,7 +108,7 @@ jobs:
           sed -i '/^p4a\.branch/d;/^p4a\.source_dir/d' buildozer.spec
           sed -i "/^\[app\]/a p4a.source_dir = $PWD/.p4a" buildozer.spec
           sed -i 's|^source.exclude_dirs = \(.*\)|source.exclude_dirs = \1, .p4a|' buildozer.spec
-          grep -nE "p4a|exclude_dirs" buildozer.spec
+          grep -nE "p4a|exclude_dirs|^requirements" buildozer.spec
 
       - name: Build APK
         run: |
