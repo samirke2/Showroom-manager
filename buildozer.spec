@@ -34,7 +34,7 @@ android.permissions = INTERNET, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE, R
 android.enable_androidx = True
 android.gradle_dependencies = androidx.core:core:1.9.0
 # ملاحظة: الـ <provider> يُضاف تلقائياً في build.yml (هذا المفتاح يقبل attributes فقط)
-android.add_resources = ./xml/file_paths.xml:xml
+android.add_resources = ./xml/file_paths.xml:xml/file_paths.xml
 
 android.allow_backup = True
 android.logcat_filters = *:S python:D
