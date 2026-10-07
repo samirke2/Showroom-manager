@@ -108,8 +108,20 @@ try:
             _KClock.schedule_once(_apply, 0.3)
 
     _MDAW.on_adaptive_height = _on_adaptive_height
-except Exception:
-    pass
+
+    # KivyMD 1.1.1: MDCard has no `adaptive_height` property -> TypeError in Python kwargs
+    # and a silent no-op in KV (cards overlap). Add it, and re-register the class for KV.
+    if not issubclass(MDCard, _MDAW):
+        _OrigMDCard = MDCard
+
+        class MDCard(_MDAW, _OrigMDCard):
+            pass
+
+        from kivy.factory import Factory as _KFactory
+        _KFactory.unregister("MDCard")
+        _KFactory.register("MDCard", cls=MDCard)
+except Exception as _e:
+    print("adaptive patch error:", _e)
 
 if os.path.exists(FONT_FILE):
     try:
@@ -300,16 +312,47 @@ def csv_dir():
     return d
 
 
-def get_db_path():
-    new_path = os.path.join(db_dir(), "dealership_v2.db")
-    if not os.path.exists(new_path):
-        old_path = "dealership_v2.db"
-        if os.path.exists(old_path):
+def private_dir():
+    """مجلد خاص بالتطبيق (SQLite يعمل فيه دائماً على أندرويد)."""
+    if _kivy_platform == "android":
+        base = None
+        try:
+            from jnius import autoclass
+            _act = autoclass('org.kivy.android.PythonActivity').mActivity
+            base = _act.getFilesDir().getAbsolutePath()
+        except Exception:
             try:
-                import shutil
-                shutil.copy2(old_path, new_path)
+                from android.storage import app_storage_path
+                base = app_storage_path()
+            except Exception:
+                base = None
+        if base:
+            d = os.path.join(base, "SamirPythDZ")
+            try:
+                os.makedirs(d, exist_ok=True)
+                return d
             except Exception:
                 pass
+    return app_root()
+
+
+def get_db_path():
+    dbd = os.path.join(private_dir(), "database")
+    try:
+        os.makedirs(dbd, exist_ok=True)
+    except Exception:
+        pass
+    new_path = os.path.join(dbd, "dealership_v2.db")
+    if not os.path.exists(new_path):
+        import shutil
+        for old_path in (os.path.join(db_dir(), "dealership_v2.db"),
+                         "dealership_v2.db"):
+            if os.path.exists(old_path) and os.path.abspath(old_path) != os.path.abspath(new_path):
+                try:
+                    shutil.copy2(old_path, new_path)
+                    break
+                except Exception:
+                    pass
     return new_path
 
 
