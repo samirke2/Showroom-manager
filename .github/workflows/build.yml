@@ -14,40 +14,34 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # 1. سحب الكود
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # 2. إعداد Java
     - name: Set up JDK 17
       uses: actions/setup-java@v5
       with:
         java-version: '17'
         distribution: 'temurin'
 
-    # 3. إعداد Android SDK
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
 
-    # 4. خطوة تشخيصية: طباعة هيكل الملفات لمعرفة مكان gradlew
-    - name: Verify Project Structure
-      run: |
-        echo "=== Current Directory ==="
-        pwd
-        echo "=== Files in Root ==="
-        ls -la
-        echo "=== Searching for gradlew ==="
-        find . -name "gradlew" -type f
+    # خطوة اختيارية: إذا كنت تستخدم Python في مشروعك
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
 
-    # 5. إعطاء صلاحية التنفيذ لملف gradlew
-    # ⚠️ ملاحظة: إذا وجدت أن gradlew داخل مجلد android، غير المسار أدناه إلى ./android/gradlew
+    # خطوة اختيارية: إذا كنت تستخدم ccache لتسريع البناء
+    - name: Setup ccache
+      uses: hendrikmuhs/ccache-action@v1.2.24
+      with:
+        key: ${{ github.job }}-${{ runner.os }}
+
+    # ⚠️ تنبيه: إذا كان مشروعك في مجلد فرعي، غير المسار إلى ./android/gradlew
     - name: Grant execute permission for gradlew
       run: chmod +x ./gradlew
 
-    # 6. البناء
-    # ⚠️ ملاحظة: إذا كان gradlew داخل مجلد android، غير الأمر إلى ./android/gradlew assembleDebug
+    # ⚠️ تنبيه: إذا كان مشروعك في مجلد فرعي، غير الأمر إلى ./android/gradlew assembleDebug
     - name: Build with Gradle
       run: ./gradlew assembleDebug
-      env:
-        # هذا المتغير يساعد Gradle في العثور على Android SDK
-        ANDROID_HOME: ${{ env.ANDROID_HOME }}
