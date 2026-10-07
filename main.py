@@ -109,8 +109,6 @@ try:
 
     _MDAW.on_adaptive_height = _on_adaptive_height
 
-    # KivyMD 1.1.1: MDCard has no `adaptive_height` property -> TypeError in Python kwargs
-    # and a silent no-op in KV (cards overlap). Add it, and re-register the class for KV.
     if not issubclass(MDCard, _MDAW):
         _OrigMDCard = MDCard
 
@@ -277,7 +275,6 @@ def app_storage_dir():
 
 
 def request_android_permissions():
-    """طلب صلاحيات وقت التشغيل (Android 6+)."""
     if not IS_ANDROID:
         return
     try:
@@ -313,7 +310,6 @@ def csv_dir():
 
 
 def private_dir():
-    """مجلد خاص بالتطبيق (SQLite يعمل فيه دائماً على أندرويد)."""
     if _kivy_platform == "android":
         base = None
         try:
@@ -557,11 +553,11 @@ def save_contract_articles(lang, articles):
 
 
 # =====================================================================
-#  الترجمة
+#  الترجمة (تم تغيير اسم التطبيق هنا)
 # =====================================================================
 TRANSLATIONS = {
     "ar": {
-        "app_title": "Showroom DZ",
+        "app_title": "Showroom Manager",  # ⬅️ تم التغيير
         "tab_cars": "السيارات", "tab_clients": "الزبائن",
         "tab_contracts": "العقود", "tab_settings": "الإعدادات",
         "stat_available": "متوفر", "stat_reserved": "محجوز", "stat_sold": "مباع",
@@ -707,9 +703,10 @@ TRANSLATIONS = {
         "copied_ok": "تم النسخ",
         "verify": "تحقق",
         "copy_id_short": "نسخ",
+        "premium_locked": "هذه الميزة متاحة في النسخة الكاملة فقط",
     },
     "fr": {
-        "app_title": "Showroom DZ",
+        "app_title": "Showroom Manager",  # ⬅️ تم التغيير
         "tab_cars": "Vehicules", "tab_clients": "Clients",
         "tab_contracts": "Contrats", "tab_settings": "Parametres",
         "stat_available": "Disponible", "stat_reserved": "Reserve", "stat_sold": "Vendu",
@@ -859,6 +856,7 @@ TRANSLATIONS = {
         "copied_ok": "Copie",
         "verify": "Verifier",
         "copy_id_short": "Copier",
+        "premium_locked": "Cette fonctionnalite est reservee a la version complete",
     }
 }
 
@@ -1660,7 +1658,7 @@ def set_field_val(field, value):
 
 
 # =====================================================================
-#  KV
+#  KV (تم إضافة canvas.before لمنع الأشرطة السوداء، و on_switch_tabs)
 # =====================================================================
 KV = '''
 <FormField@ArabicField>:
@@ -2247,6 +2245,12 @@ KV = '''
 
 MDScreen:
     md_bg_color: 0.95, 0.96, 0.98, 1
+    canvas.before:
+        Color:
+            rgba: 0.95, 0.96, 0.98, 1
+        Rectangle:
+            pos: self.pos
+            size: self.size
     MDBoxLayout:
         orientation: "vertical"
 
@@ -2288,6 +2292,7 @@ MDScreen:
                     text_size: self.width, None
 
         MDBottomNavigation:
+            on_switch_tabs: app.on_tab_switch()
             panel_color: 1, 1, 1, 1
             selected_color_background: 0.08, 0.45, 0.75, 0.12
             text_color_active: 0.08, 0.45, 0.75, 1
@@ -2391,6 +2396,12 @@ MDScreen:
                 text: app.trd("tab_settings", app.current_lang)
                 icon: "cog"
                 ScrollView:
+                    canvas.before:
+                        Color:
+                            rgba: 0.95, 0.96, 0.98, 1
+                        Rectangle:
+                            pos: self.pos
+                            size: self.size
                     MDBoxLayout:
                         orientation: "vertical"
                         adaptive_height: True
@@ -2735,7 +2746,6 @@ class ContractCard(MDCard):
 
 
 class LanguageSelector(MDBoxLayout):
-    """محدد لغة عصري بأزرار MDCard."""
     active_lang = StringProperty("ar")
 
     def select(self, lang_code):
@@ -2755,7 +2765,7 @@ class LanguageSelector(MDBoxLayout):
 class AutoManagerApp(MDApp):
     font_file = FONT_FILE if os.path.exists(FONT_FILE) else "Roboto"
     logo_path = StringProperty("")
-    app_display_title = StringProperty("Samir Pyth_DZ")
+    app_display_title = StringProperty("Showroom Manager")  # ⬅️ تم التغيير
     current_lang = StringProperty("ar")
 
     version_badge_text = StringProperty("FREE")
@@ -2973,14 +2983,27 @@ class AutoManagerApp(MDApp):
         self.notify(self.tr("lang_changed"))
 
     def build(self):
+        from kivy.core.window import Window
+        Window.clearcolor = (0.95, 0.96, 0.98, 1)
         request_android_permissions()
         self.theme_cls.theme_style = "Light"
         self.theme_cls.primary_palette = "Blue"
+        try:
+            self.theme_cls.font_styles["Icon"] = ["Icons", "materialdesignicons-webfont.ttf"]
+        except Exception:
+            pass
         try:
             init_db()
         except Exception as e:
             print("init_db error:", e)
         return Builder.load_string(KV)
+
+    def on_tab_switch(self, *args):
+        from kivy.clock import Clock
+        def _redraw(dt):
+            if self.root:
+                self.root.canvas.ask_update()
+        Clock.schedule_once(_redraw, 0.2)
 
     def load_all_data(self):
         try: self.load_cars()
@@ -3046,7 +3069,7 @@ class AutoManagerApp(MDApp):
             except Exception:
                 pass
 
-    # ========== شاشة القفل PIN (مع قفل تدريجي) ==========
+    # ========== شاشة القفل PIN ==========
     def show_lock_screen(self):
         L = self.current_lang
         title_txt = (self.ar("أدخل كلمة السر للدخول") if L == "ar"
@@ -3074,7 +3097,6 @@ class AutoManagerApp(MDApp):
             theme_text_color="Custom", text_color=(0.75, 0.22, 0.17, 1))
         box.add_widget(status_lbl)
 
-        # حالة أولية
         remaining = get_lock_until()
         if remaining > 0:
             status_lbl.text = (self.ar(f"{self.tr('locked_for')}{remaining} {self.tr('seconds')}")
@@ -3131,9 +3153,7 @@ class AutoManagerApp(MDApp):
             pos_hint={"center_x": 0.5},
             on_release=check_pin))
 
-        # ⭐ زر "نسيت كلمة السر" — لا يُغلق نافذة القفل
         def show_recovery(_=None):
-            # ✅ لا نغلق نافذة القفل — فقط نفتح نافذة الاسترجاع فوقها
             Clock.schedule_once(lambda dt: self.show_recovery_dialog(), 0.1)
 
         box.add_widget(MDFlatButton(
@@ -3240,36 +3260,29 @@ class AutoManagerApp(MDApp):
                                  halign="center")
         box.add_widget(code_field)
 
-        # ⭐ الإلغاء: يغلق نافذة الاسترجاع ويعيد فتح شاشة القفل
         def on_cancel_recovery(_=None):
-            # 1) أغلق نافذة الاسترجاع
             try:
                 self.recovery_dialog.dismiss()
             except Exception:
                 pass
             self.recovery_dialog = None
-            # 2) أغلق نافذة القفل القديمة إن كانت مفتوحة
             try:
                 if self.lock_dialog:
                     self.lock_dialog.dismiss()
             except Exception:
                 pass
             self.lock_dialog = None
-            # 3) أعد فتح شاشة القفل من جديد
             Clock.schedule_once(lambda dt: self.show_lock_screen(), 0.3)
 
-        # ⭐ نجاح الاسترجاع
         def apply_recovery(_=None):
             entered = (code_field.text or "").strip()
             if check_recovery_code(device_id, entered):
                 clear_pin()
-                # أغلق نافذة الاسترجاع
                 try:
                     self.recovery_dialog.dismiss()
                 except Exception:
                     pass
                 self.recovery_dialog = None
-                # أغلق نافذة القفل
                 try:
                     if self.lock_dialog:
                         self.lock_dialog.dismiss()
@@ -3676,7 +3689,7 @@ class AutoManagerApp(MDApp):
         L = self.current_lang
         if L == "ar":
             text = (
-                "[size=22][b]مرحباً بك في Samir Pyth_DZ[/b][/size]\n\n"
+                "[size=22][b]مرحباً بك في Showroom Manager[/b][/size]\n\n"
                 "تطبيق متكامل لإدارة معرض السيارات:\n\n"
                 "• إدارة السيارات (متوفرة / محجوزة / مباعة)\n"
                 "• إدارة الزبائن مع كامل بياناتهم\n"
@@ -3698,7 +3711,7 @@ class AutoManagerApp(MDApp):
             )
         else:
             text = (
-                "[size=22][b]Bienvenue dans Samir Pyth_DZ[/b][/size]\n\n"
+                "[size=22][b]Bienvenue dans Showroom Manager[/b][/size]\n\n"
                 "Application complete de gestion de showroom :\n\n"
                 "• Gestion des vehicules\n"
                 "• Gestion des clients\n"
@@ -3755,6 +3768,7 @@ class AutoManagerApp(MDApp):
                 "contract_limit": "وصلت للحد الأقصى (3 عقود)",
                 "company_locked": "معلومات الشركة غير قابلة للتعديل",
                 "bank_locked": "معلومات البنك غير قابلة للتعديل",
+                "premium_locked": self.tr("premium_locked"),
                 "": "احصل على النسخة الكاملة",
             }
             features = (
@@ -3776,6 +3790,7 @@ class AutoManagerApp(MDApp):
                 "contract_limit": "Limite atteinte (3 contrats)",
                 "company_locked": "Societe non modifiable",
                 "bank_locked": "Banque non modifiable",
+                "premium_locked": self.tr("premium_locked"),
                 "": "Obtenez la version complete",
             }
             features = (
@@ -3837,7 +3852,7 @@ class AutoManagerApp(MDApp):
             try:
                 from kivy.utils import platform
                 from urllib.parse import quote
-                msg = f"ترقية Samir Pyth_DZ. معرّف الجهاز: {device_id}"
+                msg = f"ترقية Showroom Manager. معرّف الجهاز: {device_id}"
                 url = "https://wa.me/213553762791?text=" + quote(msg)
                 if platform == "android":
                     from jnius import autoclass, cast
@@ -3969,7 +3984,7 @@ class AutoManagerApp(MDApp):
                                 cast('android.os.Parcelable', uri))
                 intent.putExtra(Intent.EXTRA_SUBJECT, cast(
                     'java.lang.CharSequence',
-                    String("Samir Pyth_DZ - Backup")))
+                    String("Showroom Manager - Backup")))
                 chooser = Intent.createChooser(intent,
                     cast('java.lang.CharSequence',
                          String(self.tr("backup_share_title"))))
@@ -4191,10 +4206,12 @@ class AutoManagerApp(MDApp):
 
     def on_car_select(self, item):
         self.current_car_id = item.car_id
+        is_prem = self.is_premium()
+        lock_cb = lambda x: self.show_upgrade_dialog("premium_locked")
         self.tiles_dialog(item.title, [
             (self.tr("reserve_contract"), "file-sign", (0.15, 0.55, 0.32), self.reserve_car),
-            (self.tr("edit"), "pencil-outline", (0.08, 0.45, 0.75), self.show_edit_car_dialog),
-            (self.tr("delete"), "delete-outline", (0.75, 0.22, 0.17), self.delete_car),
+            (self.tr("edit"), "pencil-outline", (0.08, 0.45, 0.75), self.show_edit_car_dialog if is_prem else lock_cb),
+            (self.tr("delete"), "delete-outline", (0.75, 0.22, 0.17), self.delete_car if is_prem else lock_cb),
             (self.tr("close"), "close-circle-outline", (0.45, 0.45, 0.5), lambda: self.car_action_dialog.dismiss()),
         ], "car_action_dialog")
 
@@ -4328,12 +4345,14 @@ class AutoManagerApp(MDApp):
 
     def on_client_select(self, item):
         self.current_client_id = item.client_id
+        is_prem = self.is_premium()
+        lock_cb = lambda x: self.show_upgrade_dialog("premium_locked")
         self.client_action_dialog = self.dlg(
             title=self.trd("client_options"), text=item.title,
             buttons=[
                 MDFlatButton(text=self.trd("client_history"), on_release=lambda x: self.show_client_history()),
-                MDFlatButton(text=self.trd("edit"), on_release=lambda x: self.show_edit_client_dialog()),
-                MDFlatButton(text=self.trd("delete"), text_color=(1, 0, 0, 1), on_release=lambda x: self.delete_client()),
+                MDFlatButton(text=self.trd("edit"), on_release=self.show_edit_client_dialog if is_prem else lock_cb),
+                MDFlatButton(text=self.trd("delete"), text_color=(1, 0, 0, 1), on_release=self.delete_client if is_prem else lock_cb),
                 MDFlatButton(text=self.trd("cancel"), on_release=lambda x: self.client_action_dialog.dismiss()),
             ],
         )
@@ -4655,12 +4674,14 @@ class AutoManagerApp(MDApp):
 
     def on_contract_select(self, item):
         self.current_contract_id = item.contract_id
+        is_prem = self.is_premium()
+        lock_cb = lambda x: self.show_upgrade_dialog("premium_locked")
         self.tiles_dialog(item.title, [
-            (self.tr("edit_contract"), "file-edit-outline", (0.08, 0.45, 0.75), self.show_edit_contract_dialog),
+            (self.tr("edit_contract"), "file-edit-outline", (0.08, 0.45, 0.75), self.show_edit_contract_dialog if is_prem else lock_cb),
             (self.tr("order_receipt"), "truck-delivery-outline", (0.0, 0.55, 0.62), self.start_order_receipt),
             (self.tr("payment_order"), "bank-transfer", (0.55, 0.27, 0.68), self.ask_payment_amount),
             (self.tr("download_pdf"), "file-pdf-box", (0.15, 0.55, 0.32), self.reprint_pdf),
-            (self.tr("cancel_contract"), "file-cancel-outline", (0.75, 0.22, 0.17), self.delete_contract),
+            (self.tr("cancel_contract"), "file-cancel-outline", (0.75, 0.22, 0.17), self.delete_contract if is_prem else lock_cb),
             (self.tr("close"), "close-circle-outline", (0.45, 0.45, 0.5), lambda: self.contract_action_dialog.dismiss()),
         ], "contract_action_dialog")
 
@@ -5144,7 +5165,7 @@ class AutoManagerApp(MDApp):
         badge = "PREMIUM" if self.is_premium() else "FREE"
         if L == "ar":
             text = (
-                f"[size=20][b]Samir Pyth_DZ[/b][/size]\n\n"
+                f"[size=20][b]Showroom Manager[/b][/size]\n\n"
                 f"النسخة: {APP_VERSION} ({badge})\n\n"
                 "[b]المطوّر[/b]\nكناف سمير\n\n"
                 "[b]التواصل[/b]\nهاتف: +213 553 762 791\nبريد: kenefsamir0@gmail.com\n\n"
@@ -5158,7 +5179,7 @@ class AutoManagerApp(MDApp):
             )
         else:
             text = (
-                f"[size=20][b]Samir Pyth_DZ[/b][/size]\n\n"
+                f"[size=20][b]Showroom Manager[/b][/size]\n\n"
                 f"Version: {APP_VERSION} ({badge})\n\n"
                 "[b]Developpeur[/b]\nKenef Samir\n\n"
                 "[b]Contact[/b]\nTel: +213 553 762 791\nEmail: kenefsamir0@gmail.com\n\n"
