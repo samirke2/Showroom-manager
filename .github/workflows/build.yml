@@ -88,6 +88,24 @@ jobs:
           done
           ls -R .buildozer/android/platform/build-arm64-v8a/packages | head -20
 
+      - name: Patch python-for-android (browser User-Agent for downloads)
+        run: |
+          set -e
+          git clone --depth 1 --branch v2024.01.21 https://github.com/kivy/python-for-android.git .p4a
+          cat >> .p4a/pythonforandroid/recipe.py <<'PYEOF'
+          
+          
+          # --- CI patch: some hosts (python.org, sqlite.org, ...) return 403 to Python-urllib ---
+          import urllib.request as _ur
+          _op = _ur.build_opener()
+          _op.addheaders = [("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36")]
+          _ur.install_opener(_op)
+          PYEOF
+          sed -i '/^p4a\.branch/d;/^p4a\.source_dir/d' buildozer.spec
+          sed -i "/^\[app\]/a p4a.source_dir = $PWD/.p4a" buildozer.spec
+          sed -i 's|^source.exclude_dirs = \(.*\)|source.exclude_dirs = \1, .p4a|' buildozer.spec
+          grep -nE "p4a|exclude_dirs" buildozer.spec
+
       - name: Build APK
         run: |
           set -o pipefail
