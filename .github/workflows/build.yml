@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [ "main", "master" ]
 
-# حل مشكلة تحذير Node.js 20
+# 1. حل مشكلة تحذير Node.js 20
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -15,33 +15,39 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # 1. سحب الكود
+    # 2. سحب الكود
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # 2. إعداد Java
+    # 3. إعداد Java (تم الترقية إلى v5 لحل التحذير)
     - name: Set up JDK 17
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         java-version: '17'
         distribution: 'temurin'
 
-    # 3. إعداد Python
+    # 4. إعداد Android SDK (خطوة ضرورية جداً لبناء تطبيقات الأندرويد)
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+
+    # 5. إعداد Python (إذا كان مشروعك يحتاجه)
     - name: Setup Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
 
-    # 4. إعداد ccache (تم تصحيح الإصدار هنا)
+    # 6. إعداد ccache (بالإصدار الصحيح)
     - name: Setup ccache
       uses: hendrikmuhs/ccache-action@v1.2.24
       with:
         key: ${{ github.job }}-${{ runner.os }}
 
-    # 5. صلاحية تنفيذ gradlew
+    # 7. إعطاء صلاحية التنفيذ لملف gradlew
+    # ⚠️ ملاحظة: إذا كان مشروعك React Native أو Flutter، غير المسار إلى ./android/gradlew
     - name: Grant execute permission for gradlew
       run: chmod +x ./gradlew
 
-    # 6. البناء النهائي
+    # 8. أمر البناء
+    # ⚠️ ملاحظة: إذا كان مشروعك React Native أو Flutter، غير الأمر إلى ./android/gradlew assembleDebug
     - name: Build with Gradle
       run: ./gradlew assembleDebug
