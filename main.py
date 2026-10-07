@@ -707,6 +707,8 @@ TRANSLATIONS = {
         "copied_ok": "تم النسخ",
         "verify": "تحقق",
         "copy_id_short": "نسخ",
+        # ⬇️ إضافة مفتاح الترجمة للنسخة المدفوعة
+        "premium_locked": "هذه الميزة متاحة في النسخة الكاملة فقط",
     },
     "fr": {
         "app_title": "Showroom DZ",
@@ -859,6 +861,8 @@ TRANSLATIONS = {
         "copied_ok": "Copie",
         "verify": "Verifier",
         "copy_id_short": "Copier",
+        # ⬇️ إضافة مفتاح الترجمة للنسخة المدفوعة
+        "premium_locked": "Cette fonctionnalite est reservee a la version complete",
     }
 }
 
@@ -2396,6 +2400,14 @@ MDScreen:
                         adaptive_height: True
                         padding: "12dp"
                         spacing: "12dp"
+                        # ⬇️ تعديل: إضافة خلفية لمنع الأشرطة السوداء أثناء التمرير ⬇️
+                        canvas.before:
+                            Color:
+                                rgba: 0.95, 0.96, 0.98, 1
+                            Rectangle:
+                                pos: self.pos
+                                size: self.size
+                        # ⬆️ نهاية التعديل ⬆️
 
                         MDCard:
                             orientation: "vertical"
@@ -2972,7 +2984,10 @@ class AutoManagerApp(MDApp):
         self.load_all_data()
         self.notify(self.tr("lang_changed"))
 
+    # ⬇️ تعديل: إضافة Window.clearcolor لمنع الأشرطة السوداء ⬇️
     def build(self):
+        from kivy.core.window import Window
+        Window.clearcolor = (0.95, 0.96, 0.98, 1)  # لون الخلفية الفاتح
         request_android_permissions()
         self.theme_cls.theme_style = "Light"
         self.theme_cls.primary_palette = "Blue"
@@ -2981,6 +2996,7 @@ class AutoManagerApp(MDApp):
         except Exception as e:
             print("init_db error:", e)
         return Builder.load_string(KV)
+    # ⬆️ نهاية التعديل ⬆️
 
     def load_all_data(self):
         try: self.load_cars()
@@ -3755,6 +3771,7 @@ class AutoManagerApp(MDApp):
                 "contract_limit": "وصلت للحد الأقصى (3 عقود)",
                 "company_locked": "معلومات الشركة غير قابلة للتعديل",
                 "bank_locked": "معلومات البنك غير قابلة للتعديل",
+                "premium_locked": self.tr("premium_locked"),
                 "": "احصل على النسخة الكاملة",
             }
             features = (
@@ -3776,6 +3793,7 @@ class AutoManagerApp(MDApp):
                 "contract_limit": "Limite atteinte (3 contrats)",
                 "company_locked": "Societe non modifiable",
                 "bank_locked": "Banque non modifiable",
+                "premium_locked": self.tr("premium_locked"),
                 "": "Obtenez la version complete",
             }
             features = (
@@ -4189,14 +4207,18 @@ class AutoManagerApp(MDApp):
         setattr(self, attr, dialog)
         dialog.open()
 
+    # ⬇️ تعديل: تعطيل التعديل والحذف في النسخة المجانية للسيارات ⬇️
     def on_car_select(self, item):
         self.current_car_id = item.car_id
+        is_prem = self.is_premium()
+        lock_cb = lambda x: self.show_upgrade_dialog("premium_locked")
         self.tiles_dialog(item.title, [
             (self.tr("reserve_contract"), "file-sign", (0.15, 0.55, 0.32), self.reserve_car),
-            (self.tr("edit"), "pencil-outline", (0.08, 0.45, 0.75), self.show_edit_car_dialog),
-            (self.tr("delete"), "delete-outline", (0.75, 0.22, 0.17), self.delete_car),
+            (self.tr("edit"), "pencil-outline", (0.08, 0.45, 0.75), self.show_edit_car_dialog if is_prem else lock_cb),
+            (self.tr("delete"), "delete-outline", (0.75, 0.22, 0.17), self.delete_car if is_prem else lock_cb),
             (self.tr("close"), "close-circle-outline", (0.45, 0.45, 0.5), lambda: self.car_action_dialog.dismiss()),
         ], "car_action_dialog")
+    # ⬆️ نهاية التعديل ⬆️
 
     def reserve_car(self):
         try:
@@ -4326,18 +4348,22 @@ class AutoManagerApp(MDApp):
             print("save_client error:", e)
             self.notify(self.tr("save_client_error"))
 
+    # ⬇️ تعديل: تعطيل التعديل والحذف في النسخة المجانية للزبائن ⬇️
     def on_client_select(self, item):
         self.current_client_id = item.client_id
+        is_prem = self.is_premium()
+        lock_cb = lambda x: self.show_upgrade_dialog("premium_locked")
         self.client_action_dialog = self.dlg(
             title=self.trd("client_options"), text=item.title,
             buttons=[
                 MDFlatButton(text=self.trd("client_history"), on_release=lambda x: self.show_client_history()),
-                MDFlatButton(text=self.trd("edit"), on_release=lambda x: self.show_edit_client_dialog()),
-                MDFlatButton(text=self.trd("delete"), text_color=(1, 0, 0, 1), on_release=lambda x: self.delete_client()),
+                MDFlatButton(text=self.trd("edit"), on_release=self.show_edit_client_dialog if is_prem else lock_cb),
+                MDFlatButton(text=self.trd("delete"), text_color=(1, 0, 0, 1), on_release=self.delete_client if is_prem else lock_cb),
                 MDFlatButton(text=self.trd("cancel"), on_release=lambda x: self.client_action_dialog.dismiss()),
             ],
         )
         self.client_action_dialog.open()
+    # ⬆️ نهاية التعديل ⬆️
 
     def show_edit_client_dialog(self):
         self.client_action_dialog.dismiss()
@@ -4653,16 +4679,20 @@ class AutoManagerApp(MDApp):
             print("save_contract error:", e)
             self.notify(self.tr("save_error"))
 
+    # ⬇️ تعديل: تعطيل التعديل وإلغاء العقد في النسخة المجانية للعقود ⬇️
     def on_contract_select(self, item):
         self.current_contract_id = item.contract_id
+        is_prem = self.is_premium()
+        lock_cb = lambda x: self.show_upgrade_dialog("premium_locked")
         self.tiles_dialog(item.title, [
-            (self.tr("edit_contract"), "file-edit-outline", (0.08, 0.45, 0.75), self.show_edit_contract_dialog),
+            (self.tr("edit_contract"), "file-edit-outline", (0.08, 0.45, 0.75), self.show_edit_contract_dialog if is_prem else lock_cb),
             (self.tr("order_receipt"), "truck-delivery-outline", (0.0, 0.55, 0.62), self.start_order_receipt),
             (self.tr("payment_order"), "bank-transfer", (0.55, 0.27, 0.68), self.ask_payment_amount),
             (self.tr("download_pdf"), "file-pdf-box", (0.15, 0.55, 0.32), self.reprint_pdf),
-            (self.tr("cancel_contract"), "file-cancel-outline", (0.75, 0.22, 0.17), self.delete_contract),
+            (self.tr("cancel_contract"), "file-cancel-outline", (0.75, 0.22, 0.17), self.delete_contract if is_prem else lock_cb),
             (self.tr("close"), "close-circle-outline", (0.45, 0.45, 0.5), lambda: self.contract_action_dialog.dismiss()),
         ], "contract_action_dialog")
+    # ⬆️ نهاية التعديل ⬆️
 
     def open_file_manager(self, mode, ext, hint):
         self.fm_mode = mode
