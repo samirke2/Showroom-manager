@@ -23,25 +23,34 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
+    # الترقية إلى v4 لتجنب حزمة 'tools' المحذوفة
     - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
+      uses: android-actions/setup-android@v4
+      with:
+        packages: 'platform-tools'
 
-    # خطوة اختيارية: إذا كنت تستخدم Python في مشروعك
+    # قبول تراخيص SDK بشكل غير تفاعلي (لتجنب سؤال y/N)
+    - name: Accept Android SDK licenses
+      run: yes | sdkmanager --licenses || true
+
+    # خطوة اختيارية: إعداد Python إذا كان مشروعك يحتاجه
     - name: Setup Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
 
-    # خطوة اختيارية: إذا كنت تستخدم ccache لتسريع البناء
+    # خطوة اختيارية: إعداد ccache لتسريع البناء
     - name: Setup ccache
       uses: hendrikmuhs/ccache-action@v1.2.24
       with:
         key: ${{ github.job }}-${{ runner.os }}
 
-    # ⚠️ تنبيه: إذا كان مشروعك في مجلد فرعي، غير المسار إلى ./android/gradlew
+    # منح صلاحية التنفيذ لملف gradlew
+    # ⚠️ إذا كان مشروعك React Native أو Flutter، غير المسار إلى ./android/gradlew
     - name: Grant execute permission for gradlew
       run: chmod +x ./gradlew
 
-    # ⚠️ تنبيه: إذا كان مشروعك في مجلد فرعي، غير الأمر إلى ./android/gradlew assembleDebug
+    # أمر البناء النهائي
+    # ⚠️ إذا كان مشروعك React Native أو Flutter، غير الأمر إلى ./android/gradlew assembleDebug
     - name: Build with Gradle
       run: ./gradlew assembleDebug
