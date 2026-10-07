@@ -111,6 +111,11 @@ jobs:
           set -o pipefail
           buildozer -v android debug 2>&1 | tee build.log
 
+      - name: FAILED DOWNLOAD URL (copy this step)
+        if: failure()
+        run: |
+          sed 's/\x1b\[[0-9;]*m//g' build.log | grep -a "Downloading .* from" | tail -n 3 | cut -c1-300 || true
+
       - name: Show error summary
         if: failure()
         run: |
